@@ -31,17 +31,19 @@ export class AIService {
         maxTokens: config.maxTokens,
       };
 
-      // Add tools if provided
-      if (tools) {
+      // Add tools if provided with maxSteps for multi-step tool calling
+      if (tools && Object.keys(tools).length > 0) {
         streamConfig.tools = tools;
+        streamConfig.maxSteps = 5; // Allow up to 5 tool call steps
+        
+        console.log(chalk.gray(`[DEBUG] Tools enabled: ${Object.keys(tools).join(', ')}`));
       }
 
       const result = streamText(streamConfig);
       
       let fullResponse = "";
-      const toolCalls = [];
-      const toolResults = [];
       
+      // Stream text chunks
       for await (const chunk of result.textStream) {
         fullResponse += chunk;
         if (onChunk) {
@@ -49,22 +51,29 @@ export class AIService {
         }
       }
 
-      // Wait for full result to get tool calls
-      const fullResult =  result;
+      // IMPORTANT: Await the result to get access to steps, toolCalls, etc.
+      const fullResult = await result;
       
-      // Handle tool calls if present
-      if (fullResult.toolCalls && fullResult.toolCalls.length > 0) {
-        for (const toolCall of fullResult.toolCalls) {
-          toolCalls.push(toolCall);
-          if (onToolCall) {
-            onToolCall(toolCall);
+      const toolCalls = [];
+      const toolResults = [];
+      
+      // Collect tool calls from all steps (if they exist)
+      if (fullResult.steps && Array.isArray(fullResult.steps)) {
+        for (const step of fullResult.steps) {
+          if (step.toolCalls && step.toolCalls.length > 0) {
+            for (const toolCall of step.toolCalls) {
+              toolCalls.push(toolCall);
+              if (onToolCall) {
+                onToolCall(toolCall);
+              }
+            }
+          }
+          
+          // Collect tool results
+          if (step.toolResults && step.toolResults.length > 0) {
+            toolResults.push(...step.toolResults);
           }
         }
-      }
-
-      // Handle tool results if present
-      if (fullResult.toolResults && fullResult.toolResults.length > 0) {
-        toolResults.push(...fullResult.toolResults);
       }
 
       return {
@@ -73,9 +82,11 @@ export class AIService {
         usage: fullResult.usage,
         toolCalls,
         toolResults,
+        steps: fullResult.steps,
       };
     } catch (error) {
       console.error(chalk.red("AI Service Error:"), error.message);
+      console.error(chalk.red("Full error:"), error);
       throw error;
     }
   }
@@ -88,9 +99,9 @@ export class AIService {
    */
   async getMessage(messages, tools = undefined) {
     let fullResponse = "";
-    await this.sendMessage(messages, (chunk) => {
+    const result = await this.sendMessage(messages, (chunk) => {
       fullResponse += chunk;
     }, tools);
-    return fullResponse;
+    return result.content;
   }
 }

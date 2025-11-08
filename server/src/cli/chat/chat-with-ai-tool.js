@@ -197,7 +197,7 @@ async function getAIResponse(conversationId) {
   const toolCallsDetected = [];
   
   try {
- 
+    // IMPORTANT: Pass tools in the streamText config
     const result = await aiService.sendMessage(
       aiMessages, 
       (chunk) => {
