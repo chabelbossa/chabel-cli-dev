@@ -1,4 +1,4 @@
-import { cancel, confirm, intro, isCancel, outro } from "@clack/prompts";
+import { cancel, confirm, intro, isCancel, outro  } from "@clack/prompts";
 import { logger } from "better-auth";
 import { createAuthClient } from "better-auth/client";
 import { deviceAuthorizationClient } from "better-auth/client/plugins";

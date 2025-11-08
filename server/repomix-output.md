@@ -41,6 +41,7 @@ prisma/migrations/20251106054258_conversation_model_added/migration.sql
 prisma/migrations/migration_lock.toml
 prisma/schema.prisma
 src/cli/ai/google-service.js
+src/cli/chat/chat-with-ai.js
 src/cli/commands/ai/wakeUp.js
 src/cli/commands/auth/login.js
 src/cli/main.js
@@ -95,6 +96,7 @@ node_modules
     "express": "^5.1.0",
     "figlet": "^1.9.3",
     "inquirer": "^12.10.0",
+    "node-fetch": "^3.3.2",
     "open": "^10.2.0",
     "ora": "^9.0.0",
     "prisma": "^6.18.0",
@@ -382,7 +384,8 @@ export class AIService {
    */
   async sendMessage(messages, onChunk) {
     try {
-      const { textStream, finishReason, usage } = streamText({
+      const { textStream, finishReason, usage } = 
+      streamText({
         model: this.model,
         messages: messages,
         temperature: config.temperature,
@@ -428,26 +431,93 @@ export class AIService {
 ```javascript
 import chalk from "chalk";
 import { Command } from "commander";
-import { cancel, confirm, intro, isCancel, outro } from "@clack/prompts";
 import yoctoSpinner from "yocto-spinner";
-import { authClient } from "../../../lib/auth-client.js";
-
-
+import { getStoredToken } from "../auth/login.js";
+import prisma from "../../../lib/db.js";
+import { cancel, confirm, intro, isCancel, outro , select } from "@clack/prompts";
 const wakeUpAction = async () => {
-    const {data , error} = await authClient.getSession();
-    const spinner = yoctoSpinner({ text: "Waking up..." });
-    spinner.start();
+  const token = await getStoredToken();
 
-    setTimeout(() => {
-        spinner.stop();
-        console.log(chalk.green("✅ AI is awake!"));
-    }, 1000);
+  if (!token || !token.access_token) {
+    console.log(chalk.red("Not authenticated. Please login."));
+    return;
+  }
 
-    console.log(chalk.green(`Hello ${data?.user?.name}! Select the options below to get started.`));
-}
+  const spinner = yoctoSpinner({ text: "Fetching User Information..." });
+  spinner.start();
+
+  const user = await prisma.user.findFirst({
+    where: {
+      sessions: {
+        some: {
+          token: token.access_token,
+        },
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      image: true,
+    },
+  });
+
+  spinner.stop();
+
+  if (!user) {
+    console.log(chalk.red("User not found."));
+    return;
+  }
 
 
-export const wakeUp = new Command("wakeup").description("Wake up the AI").action(wakeUpAction)
+
+  console.log(chalk.green(`\nWelcome back, ${user.name}!\n`));
+
+  const optionsToContinue = [
+    {
+      value:"Chat",
+      label:"Chat",
+      description:"Select this option if you want to chat with the AI.",
+    },
+    {
+      value:"Tool Calling",
+      label:"Tool Calling",
+      description:"Select this option if you want to call a tool.",
+    },
+    {
+      value:"Agentic Mode",
+      label:"Agentic Mode",
+      description:"Select this option if you want to use agentic mode.",
+    },
+  ]
+
+ 
+  const choice = await select({
+    message: "Select an option:",
+    options: optionsToContinue,
+  })
+
+
+  switch (choice) {
+    case "Chat":
+      console.log(chalk.green(`\nYou have selected to chat with the AI.\n`));
+      break;
+    case "Tool Calling":
+      console.log(chalk.green(`\nYou have selected to call a tool.\n`));
+      break;
+    case "Agentic Mode":
+      console.log(chalk.green(`\nYou have selected to use agentic mode.\n`));
+      break;
+    default:
+      console.log(chalk.red(`\nInvalid option selected.\n`));
+      break;
+  }
+
+};
+
+export const wakeUp = new Command("wakeup")
+  .description("Wake up the AI")
+  .action(wakeUpAction);
 ```
 
 ## File: src/cli/commands/auth/login.js
@@ -465,6 +535,7 @@ import path from "path";
 import yoctoSpinner from "yocto-spinner";
 import * as z from "zod/v4";
 import dotenv from "dotenv";
+import prisma from "../../../lib/db.js";
 
 dotenv.config();
 
@@ -751,12 +822,16 @@ async function pollForToken(authClient, deviceCode, clientId, initialInterval) {
         });
 
         if (data?.access_token) {
+          console.log(
+            chalk.bold.yellow(`Your access token: ${data.access_token}`)
+          );
           spinner.stop();
           resolve(data);
           return;
         } else if (error) {
           switch (error.error) {
             case "authorization_pending":
+              // Continue polling
               break;
             case "slow_down":
               pollingInterval += 5;
@@ -828,78 +903,34 @@ export async function logoutAction() {
 // ============================================
 
 export async function whoamiAction(opts) {
-  const options = z
-    .object({
-      serverUrl: z.string().optional(),
-    })
-    .parse(opts);
-
-  const serverUrl = options.serverUrl || DEMO_URL;
-
-  intro(chalk.bold("👤 Current User"));
-
   const token = await requireAuth();
-
-  if (token) {
-    console.log(chalk.gray(`\n✅ Token loaded from: ${TOKEN_FILE}`));
+  if (!token?.access_token) {
+    console.log("No access token found. Please login.");
+    process.exit(1);
   }
 
-  const spinner = yoctoSpinner({ text: "Fetching user info..." });
-  spinner.start();
+  const user = await prisma.user.findFirst({
+    where: {
+      sessions: {
+        some: {
+          token: token.access_token,
+        },
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      image: true,
+    },
+  });
 
-  try {
-    // Call your backend's /api/me route with the Bearer token
-    const response = await fetch(`${serverUrl}/api/me`);
-
-    spinner.stop();
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.log(
-        chalk.red(`\n❌ Failed to fetch user info (${response.status})`)
-      );
-      console.log(chalk.gray(`   ${errorText}`));
-
-      if (response.status === 401) {
-        console.log(chalk.yellow("\n   Your token may be invalid or expired."));
-        console.log(chalk.gray("   Try: your-cli login\n"));
-      }
-      return;
-    }
-
-    const data = await response.json();
-
-    if (!data?.user) {
-      console.log(chalk.yellow("\n⚠️  No user data returned from server"));
-      console.log(chalk.gray("   Response:"), JSON.stringify(data, null, 2));
-      return;
-    }
-
-    console.log("");
-    console.log(chalk.cyan("User Information:"));
-    console.log(chalk.gray(`  Name: ${data.user.name || "N/A"}`));
-    console.log(chalk.gray(`  Email: ${data.user.email || "N/A"}`));
-    console.log(chalk.gray(`  ID: ${data.user.id || "N/A"}`));
-
-    if (token.expires_at) {
-      const expiresAt = new Date(token.expires_at);
-      const now = new Date();
-      const daysLeft = Math.round(
-        (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      console.log(
-        chalk.gray(
-          `  Token expires: ${expiresAt.toLocaleString()} (in ${daysLeft} days)`
-        )
-      );
-    }
-
-    console.log("");
-  } catch (err) {
-    spinner.stop();
-    console.error(chalk.red("\n❌ Failed to fetch user info:"), err.message);
-    console.log(chalk.gray("\nTry running 'your-cli login' again.\n"));
-  }
+  // Output user session info
+  console.log(
+    chalk.bold.greenBright(`\n👤 User: ${user.name}
+📧 Email: ${user.email}
+👤 ID: ${user.id}`)
+  );
 }
 
 // ============================================
@@ -939,41 +970,42 @@ import { wakeUp } from "./commands/ai/wakeUp.js";
 dotenv.config();
 
 async function main() {
-    // Display banner
-    console.log(
-        chalk.cyan(
-            figlet.textSync("Orbit CLI", {
-                font: "Standard",
-                horizontalLayout: "default",
-            })
-        )
-    );
-    console.log(chalk.gray("A Cli based AI tool \n"));
+  // Display banner
+  console.log(
+    chalk.cyan(
+      figlet.textSync("Orbit CLI", {
+        font: "Standard",
+        horizontalLayout: "default",
+      })
+    )
+  );
+  console.log(chalk.gray("A Cli based AI tool \n"));
 
-    const program = new Command("orbit");
-    
-    program
-        .version("0.0.1")
-        .description("Orbit CLI - Device Flow Authentication");
+  const program = new Command("orbit");
 
-    // Add commands
-    program.addCommand(wakeUp);
-    program.addCommand(login);
-    program.addCommand(logout);
-    program.addCommand(whoami);
+  program
+    .version("0.0.1")
+    .description("Orbit CLI - Device Flow Authentication");
+
+  // Add commands
+  program.addCommand(wakeUp);
+  program.addCommand(login);
+  program.addCommand(logout);
+  program.addCommand(whoami);
+
+  // Default action shows help
+  program.action(() => {
+    program.help();
+  });
 
 
-    // Default action shows help
-    program.action(() => {
-        program.help();
-    });
 
-    program.parse();
+  program.parse();
 }
 
 main().catch((error) => {
-    console.error(chalk.red("Error running Orbit CLI:"), error);
-    process.exit(1);
+  console.error(chalk.red("Error running Orbit CLI:"), error);
+  process.exit(1);
 });
 ```
 
@@ -991,9 +1023,8 @@ export const config = {
 ## File: src/index.js
 ```javascript
 import express from "express";
-
 import { auth } from "./lib/auth.js";
-import { fromNodeHeaders ,toNodeHandler} from "better-auth/node";
+import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
 import cors from "cors";
 
 const app = express();
@@ -1011,24 +1042,54 @@ app.all("/api/auth/*splat", toNodeHandler(auth));
 
 app.use(express.json());
 
+// Fixed: This endpoint now properly handles Bearer token authentication
 app.get("/api/me", async (req, res) => {
- 	const session = await auth.api.getSession({
+  try {
+    const session = await auth.api.getSession({
       headers: fromNodeHeaders(req.headers),
     });
- 	return res.json(session);
+    
+    if (!session) {
+      return res.status(401).json({ error: "No active session" });
+    }
+    
+    return res.json(session);
+  } catch (error) {
+    console.error("Session error:", error);
+    return res.status(500).json({ error: "Failed to get session", details: error.message });
+  }
 });
 
+// You can remove this endpoint if you're using the Bearer token approach above
+app.get("/api/me/:access_token", async (req, res) => {
+  const { access_token } = req.params;
+  console.log(access_token);
+  
+  try {
+    const session = await auth.api.getSession({
+      headers: {
+        authorization: `Bearer ${access_token}`
+      }
+    });
+    
+    if (!session) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+    
+    return res.json(session);
+  } catch (error) {
+    console.error("Token validation error:", error);
+    return res.status(401).json({ error: "Unauthorized", details: error.message });
+  }
+});
 
-
-app.get("/device" , async (req, res) => {
-  const {user_code} = req.params;
-
+app.get("/device", async (req, res) => {
+  const { user_code } = req.query; // Fixed: should be req.query, not req.params
   res.redirect(`http://localhost:3000/device?user_code=${user_code}`);
-})
+});
 
 app.listen(port, () => {
-
-	console.log(`Example app listening on port ${port}`);
+  console.log(`Example app listening on port ${port}`);
 });
 ```
 
@@ -1075,6 +1136,7 @@ export const auth = betterAuth({
     },
   
   },
+
     logger: {
         level: "debug"
     }
