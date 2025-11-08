@@ -28,6 +28,8 @@
     "express": "^5.1.0",
     "figlet": "^1.9.3",
     "inquirer": "^12.10.0",
+    "marked": "^15.0.12",
+    "marked-terminal": "^7.3.0",
     "node-fetch": "^3.3.2",
     "open": "^10.2.0",
     "ora": "^9.0.0",
