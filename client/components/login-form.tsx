@@ -18,61 +18,56 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { GithubIcon } from "lucide-react";
+import { useState } from "react";
 
 
-const loginSchema = z.object({
-  email: z.string().min(1, "Email is required").email("Email is invalid"),
-  password: z.string().min(1, "Password is required").min(6, "Password must be at least 6 characters"),
-});
 
-type LoginFormValues = z.infer<typeof loginSchema>;
+
 
 export function LoginForm() {
   const router = useRouter();
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-  });
+  const [isLoading, setIsLoading] = useState(false);
 
 
- 
-  const isPending = form.formState.isSubmitting;
+const onLogin = async()=>{
+  setIsLoading(true);
+  await authClient.signIn.social({
+    provider: "github",
+    callbackURL: "http://localhost:3000"
+  })
+  setIsLoading(false);
+}
+
 
   return (
-    <div className="flex flex-col gap-6">
-      <Card>
-        <CardHeader className="text-center">
-          <CardTitle >Welcome back</CardTitle>
-          <CardDescription>
-            Login to Continue
-          </CardDescription>
-        </CardHeader>
-
+    <div className="flex flex-col gap-6 justify-center items-center ">
+      <div className="flex flex-col items-center justify-center space-y-4">
+        <Image src={"/login.svg"} alt="Login" height={500} width={500}/>
+        <h1 className="text-6xl font-extrabold text-indigo-400">Welcome Back! to Orbital Cli</h1>
+        <p className="text-base font-medium text-zinc-400">Login to your account for allowing device flow</p>
+      </div>
+      <Card className="border-dashed border-2">
         <CardContent>
-       
-  
-              <div className="grid gap-6">
-                <div className="flex flex-col gap-4">
-                  <Button
-                    variant={"outline"}
-                    className="w-full"
-                    type="button"
-                    onClick={()=>authClient.signIn.social({
-                        provider:"github",
-                        callbackURL:"http://localhost:3000"
-                    })}
-                  >
-                    <GithubIcon className="size-4"/>
-                    Continue With GitHub
-                  </Button>
+          <div className="grid gap-6">
+            <div className="flex flex-col gap-4">
+              <Button
+                variant={"outline"}
+                className="w-full h-full"
+                type="button"
+                onClick={() => authClient.signIn.social({
+                  provider: "github",
+                  callbackURL: "http://localhost:3000"
+                })}
                
-                </div>
-             
-              </div>
-          
+              >
+                <Image src={"/github.svg"} alt="Github" height={16} width={16} className="size-4 dark:invert" />
+                Continue With GitHub
+              </Button>
+
+            </div>
+
+          </div>
+
         </CardContent>
       </Card>
     </div>
