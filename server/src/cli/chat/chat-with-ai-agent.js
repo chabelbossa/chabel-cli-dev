@@ -7,7 +7,6 @@ import { getStoredToken } from "../commands/auth/login.js";
 import prisma from "../../lib/db.js";
 import { generateApplication } from "../../config/agent.config.js";
 
-
 const aiService = new AIService();
 const chatService = new ChatService();
 
@@ -126,7 +125,7 @@ async function agentLoop(conversation) {
     await saveMessage(conversation.id, "user", userInput);
 
     try {
-      // Generate application
+      // Generate application using structured output
       const result = await generateApplication(
         userInput,
         aiService,
@@ -142,9 +141,9 @@ async function agentLoop(conversation) {
         
         await saveMessage(conversation.id, "assistant", responseMessage);
 
-        // Ask if user wants to make changes
+        // Ask if user wants to generate another app
         const continuePrompt = await confirm({
-          message: chalk.cyan("Would you like to generate another application or make changes?"),
+          message: chalk.cyan("Would you like to generate another application?"),
           initialValue: false,
         });
 
@@ -154,16 +153,7 @@ async function agentLoop(conversation) {
         }
 
       } else {
-        console.log(chalk.yellow("\n⚠️  Generation failed. Try rephrasing your request.\n"));
-        
-        const retry = await confirm({
-          message: chalk.cyan("Would you like to try again?"),
-          initialValue: true,
-        });
-
-        if (isCancel(retry) || !retry) {
-          break;
-        }
+        throw new Error("Generation returned no result");
       }
 
     } catch (error) {
