@@ -88,7 +88,7 @@ export async function requireAuth() {
 
   if (!token) {
     console.log(
-      chalk.red("❌ Not authenticated. Please run 'your-cli login' first.")
+      chalk.red("❌ Not authenticated. Please run 'chabel login' first.")
     );
     process.exit(1);
   }
@@ -97,7 +97,7 @@ export async function requireAuth() {
     console.log(
       chalk.yellow("⚠️  Your session has expired. Please login again.")
     );
-    console.log(chalk.gray("   Run: your-cli login\n"));
+    console.log(chalk.gray("   Run: chabel login\n"));
     process.exit(1);
   }
 
@@ -119,7 +119,7 @@ export async function loginAction(opts) {
   const serverUrl = options.serverUrl || DEMO_URL;
   const clientId = options.clientId || CLIENT_ID;
 
-  intro(chalk.bold("🔐 Better Auth CLI Login"));
+  intro(chalk.bold("🔐 Chabel CLI Login"));
 
   if (!clientId) {
     logger.error("CLIENT_ID is not set in .env file");
@@ -292,7 +292,7 @@ async function pollForToken(authClient, deviceCode, clientId, initialInterval) {
           client_id: clientId,
           fetchOptions: {
             headers: {
-              "user-agent": `Better Auth CLI`,
+              "user-agent": `Chabel CLI`,
             },
           },
         });
@@ -414,8 +414,8 @@ export async function whoamiAction(opts) {
 // ============================================
 
 export const login = new Command("login")
-  .description("Login to Better Auth")
-  .option("--server-url <url>", "The Better Auth server URL", DEMO_URL)
+  .description("Login to Chabel CLI authentication")
+  .option("--server-url <url>", "The Chabel CLI auth server URL", DEMO_URL)
   .option("--client-id <id>", "The OAuth client ID", CLIENT_ID)
   .action(loginAction);
 
@@ -425,5 +425,5 @@ export const logout = new Command("logout")
 
 export const whoami = new Command("whoami")
   .description("Show current authenticated user")
-  .option("--server-url <url>", "The Better Auth server URL", DEMO_URL)
+  .option("--server-url <url>", "The Chabel CLI auth server URL", DEMO_URL)
   .action(whoamiAction);

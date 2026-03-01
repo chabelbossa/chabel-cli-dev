@@ -38,7 +38,7 @@ async function getUserFromToken() {
   const token = await getStoredToken();
   
   if (!token?.access_token) {
-    throw new Error("Not authenticated. Please run 'orbit login' first.");
+    throw new Error("Not authenticated. Please run 'chabel login' first.");
   }
 
   const spinner = yoctoSpinner({ text: "Authenticating..." }).start();
@@ -248,7 +248,7 @@ export async function startChat(mode = "chat", conversationId = null) {
   try {
     // Display intro banner
     intro(
-      boxen(chalk.bold.cyan("🚀 Orbit AI Chat"), {
+      boxen(chalk.bold.cyan("🚀 Chabel AI Chat"), {
         padding: 1,
         borderStyle: "double",
         borderColor: "cyan",

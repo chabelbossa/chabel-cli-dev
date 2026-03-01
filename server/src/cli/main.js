@@ -16,19 +16,19 @@ async function main() {
   // Display banner
   console.log(
     chalk.cyan(
-      figlet.textSync("Orbit CLI", {
+      figlet.textSync("Chabel CLI", {
         font: "Standard",
         horizontalLayout: "default",
       })
     )
   );
-  console.log(chalk.gray("A Cli based AI tool \n"));
+  console.log(chalk.gray("A CLI-based AI tool\n"));
 
-  const program = new Command("orbit");
+  const program = new Command("chabel");
 
   program
     .version("0.0.1")
-    .description("Orbit CLI - Device Flow Authentication");
+    .description("Chabel CLI - Device Flow Authentication");
 
   // Add commands
   program.addCommand(wakeUp);
@@ -47,6 +47,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(chalk.red("Error running Orbit CLI:"), error);
+  console.error(chalk.red("Error running Chabel CLI:"), error);
   process.exit(1);
 });

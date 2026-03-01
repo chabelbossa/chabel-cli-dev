@@ -1,10 +1,10 @@
 {
-  "name": "server",
+  "name": "chabel-cli-dev-server",
   "version": "1.0.0",
   "description": "",
   "main": "src/index.js",
   "bin": {
-    "orbit": "src/cli/main.js"
+    "chabel": "src/cli/main.js"
   },
   "scripts": {
     "dev": "nodemon src/index.js",
